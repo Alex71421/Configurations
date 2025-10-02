@@ -1,0 +1,8 @@
+тест 1: script_vfs
+python main.py --vfs Users\user\PycharmProjects --script script_vfs.sh
+
+тест 2: script_prompt
+python main.py --prompt "NIGGA$" --script script_prompt.sh
+
+тест 3: script_crash
+python main.py --script script_crash.sh
