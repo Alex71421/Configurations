@@ -1,6 +1,6 @@
 import os                                                               # для операций с файлами
 import shlex                                                            # для анализа синтаксиса оболочки Unix
-import socket                                                           # получить имя хоста
+import socket                                                           # получить имя хоста (компа)
 import getpass                                                          # получить имя текущего пользователя
 import sys
 import argparse                                                         # для разбора параметров командной строки (--vfs, --prompt, --script)
@@ -16,7 +16,7 @@ def make_invite_line():
         return params['prompt'] + ' '                                   # возвращаем пользовательскую строку
 
     user = getpass.getuser()                                            # получение имя юзера системы
-    host = socket.gethostname()                                         # получение имя хоста системы
+    host = socket.gethostname()                                         # получение имя хоста системы (компа)
 
     current_path = params.get('current_working_directory', ['root'])    # получение текущего пути, если None - root
 
@@ -50,6 +50,7 @@ def do_command(line):
     Выполняет одну строку команды (сделал, чтобы можно было выполнять как из REPL, так и из скрипта).
     Возвращает True, если команда выполнена успешно и False, если произошла ошибка.
     """
+    command_history.append(line)                                        # добавляем команду в историю
 
     try:
         args = parse_command(line)                                      # разбираем строку на команды
@@ -66,11 +67,17 @@ def do_command(line):
         print("exit")
         sys.exit(0)
 
-    elif command == "ls":
+    elif command == "ls":                                               # вывод файлов и папок текущей директории
         handle_ls(args)
 
-    elif command == "cd":
+    elif command == "cd":                                               # смена рабочей директории
         handle_cd(args)
+
+    elif command == "whoami":                                           # вывод имени пользователя
+        handle_whoami(args)
+
+    elif command == "history":                                          # вывод истории команд
+        handle_history(args)
 
     elif command == "conf-dump":                                        # служебная команда для вывода конфигурации
         for key, value in params.items():
@@ -159,6 +166,7 @@ def get_folder(path):
 
     return out_folder                                                   # возвращаем словарь искомой папки
 
+
 def handle_ls(args):
     """
     ls - выводит содержимое текущей папки VFS
@@ -244,6 +252,22 @@ def handle_cd(args):
         print('cd: папка не найдена')                                   # если не нашли - вывод ошибки
 
 
+def handle_whoami(args):
+    """
+    whoami — выводит имя пользователя
+    """
+    user = getpass.getuser()                                            # получение имя юзера системы
+    print(user)
+
+
+def handle_history(args):
+    """
+    history — выводит историю команд по номерам
+    """
+    for index, command in enumerate(command_history):
+        print(f'{index + 1} {command}')
+
+
 def repl():
     """
     Основной цикл REPL.
@@ -278,6 +302,7 @@ if __name__ == "__main__":
         'vfs_path': os.path.abspath(params_temp.vfs) if params_temp.vfs else None,  # абсолютный путь, если путь не указан - None
         'prompt': params_temp.prompt,
         'script_path': params_temp.script}
+    command_history = []                                                # список, в котором будут храниться команды
 
     if params_temp.vfs != None:                                         # если путь к vfs указан
         vfs = load_vfs()                                                # загрузка vfs при старте эмулятора

@@ -15,3 +15,6 @@ python main.py --vfs vfs_medium.xml --script script_medium_vfs.sh
 
 тест 6: vfs_large - vfs с 3+ уровнями вложенности
 python main.py --vfs vfs_large.xml --script script_large_vfs.sh
+
+тест 7: whoami and history test
+python main.py --vfs vfs_large.xml --script script_4stage.sh
