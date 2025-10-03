@@ -1,0 +1,35 @@
+<filesystem>
+    <folder name="root">
+        <!-- readme.txt содержит "Wassup my dog!" -->
+        <file name="readme.txt">V2Fzc3VwIG15IGRvZyE=</file>
+
+        <folder name="docs">
+            <!-- manual.pdf содержит "PDF content example" -->
+            <file name="manual.pdf">UERGIGNvbnRlbnQgZXhhbXBsZQ==</file>
+
+            <folder name="tutorials">
+                <!-- lesson1.txt содержит "Test lesson 1" -->
+                <file name="lesson1.txt">VGVzdCBsZXNzb24gMQ==</file>
+                <!-- lesson2.txt содержит "Test lesson 2" -->
+                <file name="lesson2.txt">VGVzdCBsZXNzb24gMg==</file>
+            </folder>
+        </folder>
+
+        <folder name="bin">
+            <!-- run.sh содержит "#!/bin/bash" -->
+            <file name="run.sh">IyEvYmluL2Jhc2g=</file>
+        </folder>
+
+        <folder name="home">
+            <folder name="user">
+                <!-- notes.txt содержит "Hello user!" -->
+                <file name="notes.txt">SGVsbG8gdXNlcg==</file>
+
+                <folder name="projects">
+                    <!-- project1.txt содержит "Project 1 content" -->
+                    <file name="project1.txt">UHJvamVjdCAxIGNvbnRlbnQ=</file>
+                </folder>
+            </folder>
+        </folder>
+    </folder>
+</filesystem>

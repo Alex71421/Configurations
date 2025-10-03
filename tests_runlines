@@ -1,8 +1,17 @@
 тест 1: script_vfs
-python main.py --vfs Users\user\PycharmProjects --script script_vfs.sh
+python main.py --vfs vfs_large.xml --script script_vfs.sh
 
 тест 2: script_prompt
 python main.py --prompt "NIGGA$" --script script_prompt.sh
 
 тест 3: script_crash
 python main.py --script script_crash.sh
+
+тест 4: vfs_minimal - минимальный VFS
+python main.py --vfs vfs_minimal.xml --script script_minimal_vfs.sh
+
+тест 5: vfs_medium - vfs с файлами и папками
+python main.py --vfs vfs_medium.xml --script script_medium_vfs.sh
+
+тест 6: vfs_large - vfs с 3+ уровнями вложенности
+python main.py --vfs vfs_large.xml --script script_large_vfs.sh
