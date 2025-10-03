@@ -18,3 +18,6 @@ python main.py --vfs vfs_large.xml --script script_large_vfs.sh
 
 тест 7: whoami and history test
 python main.py --vfs vfs_large.xml --script script_4stage.sh
+
+тест 8: chown and mv test
+python main.py --vfs vfs_large.xml --script script_5stage.sh

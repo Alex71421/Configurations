@@ -83,6 +83,12 @@ def do_command(line):
         for key, value in params.items():
             print(f"{key} = {value}")
 
+    elif command == "mv":                                               # перемещение/переименование объекта
+        handle_mv(args)
+
+    elif command == "chown":                                            # смена владельца объекта
+        handle_chown(args)
+
     else:                                                               # если неизвестная команда — сообщаем об ошибке
         print(f"{command}: команда не найдена")
         return False
@@ -133,22 +139,26 @@ def load_vfs():
         return None
 
 
-    def parse_folder(folder):                                           # рекурсивная функция, которая парсит папку за папкой в дереве иерархии
-        current_folder = {}                                             # словарь хранения содержимого текущей папки
+    def parse_folder(folder, owner='root'):                                           # рекурсивная функция, которая парсит папку за папкой в дереве иерархии
+        current_folder = {
+            "_type": 'folder',
+            "_owner": owner
+        }                                             # словарь хранения содержимого текущей папки
         for element in folder:
-
-            if element.tag == "folder":                                 # если элемент - папка
-                element_name = element.attrib.get("name")               # получаем имя папки
-                current_folder[element_name] = parse_folder(element)    # рекурсивно парсим вложенную папку
-
-            if element.tag == "file":                                   # если элемент - файл
-                file_name = element.attrib.get("name")                  # получаем имя файла
-                # декодируем содержимое base64 в байтовую строку. element.text - содержимое тега, если оно пустое, тогда "" (вместо None)
-                current_folder[file_name] = base64.b64decode(element.text or "")
+            name = element.attrib.get('name')
+            if element.tag == 'folder':                                 # если элемент - папка
+                current_folder[name] = parse_folder(element)
+            if element.tag == 'file':                                   # если элемент - файл
+                current_folder[name] = {
+                    "_type": "file",
+                    "_owner": owner,
+                    # декодируем содержимое base64 в байтовую строку. element.text - содержимое тега, если оно пустое, тогда "" (вместо None)
+                    "_content": base64.b64decode(element.text or "")
+                }
 
         return current_folder
 
-    vfs = {"root": parse_folder(root_element[0])}                       # парсим корневую папку, записываем в словарь root, т.к. при рекурсии она не учитывается
+    vfs = {'root': parse_folder(root_element[0])}                       # парсим корневую папку, записываем в словарь root, т.к. при рекурсии она не учитывается
     return vfs                                                          # возвращаем словарь с vfs
 
 
@@ -160,7 +170,7 @@ def get_folder(path):
     out_folder = params["vfs"]                                          # создаем аутпут папку и кладем туда vfs
 
     for folder in path:
-        if folder not in out_folder or not isinstance(out_folder[folder], dict):      # если папки нет или она не является словарем
+        if folder not in out_folder or out_folder[folder]['_type'] != 'folder':      # если папки нет или она не является словарем
             return None
         out_folder = out_folder[folder]                                 # переходим в следующую папку
 
@@ -175,12 +185,14 @@ def handle_ls(args):
     if vfs is None:                                                     # если vfs не загружен
         print("Ошибка: VFS не загружен")
         return
-    folder = get_folder(params["current_working_directory"])   # получаем словарь текущей папки
+    folder = get_folder(params["current_working_directory"])            # получаем словарь текущей папки
     for name, content in folder.items():                                # перебираем элементы текущей папки
-        if isinstance(content, dict):                                   # если элемент — папка (т.е. содержимое словарь)
-            print(f"{name}/")                                           # обозначаем папку "/"
+        if name[0] == '_':
+            continue
+        if content['_type'] == "folder":                                # если элемент — папка (т.е. содержимое словарь)
+            print(f'{name}/ (owner: {content["_owner"]})')              # обозначаем папку "/"
         else:                                                           # если элемент — файл
-            print(name)                                                 # выводим имя файла
+            print(f'{name} (owner: {content["_owner"]})')                                                 # выводим имя файла
 
 
 def handle_cd(args):
@@ -225,7 +237,7 @@ def handle_cd(args):
             print('cd: уже в корне')
         return
 
-    elif target.startswith('/'):                                        # если указан абсолютный путь от корня
+    elif target[0] == '/':                                               # если указан абсолютный путь от корня
         parts = ["root"] + [i for i in target.split("/") if i]          # получаем список из папок переданного пути, if i для отброски пустой строки в начале
         folder = get_folder(parts)                                      # получаем искомую папку
         if folder is not None:                                          # если папка существует
@@ -234,7 +246,7 @@ def handle_cd(args):
             print('cd: такого пути не существует')                      # иначе ошибка
         return
 
-    elif target.startswith("~"):                                        # аналогично абсолютному пути, только от домашней папки
+    elif target[0] == '~':                                               # аналогично абсолютному пути, только от домашней папки
         parts = ["root", "home", "user"] + [i for i in target.split("/") if i != '~'] # if i чтобы ~ в начале пустую строку
         folder = get_folder(parts)                                      # получаем искомую папку
         if folder is not None:                                          # если папка существует
@@ -267,6 +279,87 @@ def handle_history(args):
     for index, command in enumerate(command_history):
         print(f'{index + 1} {command}')
 
+
+def handle_mv(args):
+    """
+    mv <источник> <пункт назначения> — перемещает файл или папку внутри vfs
+    также может переименовывать файл, если пункт назначения - файл а не папка
+    """
+    if len(args) != 3:                                                  # проверка количества аргументов (должно быть 3)
+        print("mv: требуется два аргумента: <источник> <пункт назначения>")
+        return
+
+    source_path, destination_path = args[1], args[2]                    # исходный объект и новое имя/путь
+
+    if source_path.startswith('/'):                                     # абсолютный путь источника
+        source_parts = ["root"] + [i for i in source_path.split("/") if i]
+    else:                                                               # относительный путь источника от текущей директори
+        source_parts = params["current_working_directory"] + [i for i in source_path.split("/") if i]
+
+    if destination_path.startswith('/'):                                # абсолютный путь объекта назначения
+        destination_parts = ["root"] + [i for i in destination_path.split("/") if i]
+    else:                                                               # относительный путь об. наз. от текущей директори
+        destination_parts = params["current_working_directory"] + [i for i in destination_path.split("/") if i]
+
+    source_folder = get_folder(source_parts[:-1])                       # папка исходного объекта
+    source_name = source_parts[-1]                                      # имя исходного объекта
+    destination_folder = get_folder(destination_parts[:-1])             # папка объекта назначения
+    destination_name = destination_parts[-1]                            # имя объекта назначения
+
+    if source_folder is None or source_name not in source_folder:       # если исходная папка не найдена или объекта нет в найденной папке
+        print(f"mv: исходный объект {source_path} не найден")           # вывод ошибки
+        return
+
+    if destination_folder is None:                                      # если папка назначения не найдена
+        print(f"mv: папка назначения {destination_path} не найдена")    # вывод ошибки
+        return
+
+    object = source_folder.pop(source_name)                             # получаем объект для переноса, при этом удаляя его из исходной папка
+
+    if destination_name in destination_folder:                          # если объект назначения есть в папке назначения (файл или папка существует)
+        destination_object = destination_folder[destination_name]       # получаем объект назначения (файл или папка)
+
+        # если объект назначения - файл, а исходный - папка, то выдаем ошибку. Нельзя перенести папку в файл
+        if isinstance(object, dict) and not isinstance(destination_object, dict):
+            print(f"mv: нельзя переместить каталог '{source_path}' в файл '{destination_path}'")
+            return
+
+        if isinstance(destination_object, dict):                        # если объект назначения - папка
+            destination_object[source_name] = object                    # в эту папку кладем объект переноса по имени (не важно папка или файл)
+            print(f"{source_path} -> {destination_path} перемещено внутрь существующей папки")
+        else:                                                           # если объект назначения - файл
+            destination_folder[destination_name] = object               # то перезаписываем файл на файл для переноса
+            print(f"{source_path} -> {destination_path}: перемещено и/или переименовано")
+    else:                                                               # если объект назначения нет в папке назначения (файл или папка не существует)
+        if '.' not in str(destination_name):                            # если новый объект назначения - папка
+            destination_folder[destination_name] = {source_name: object}
+        else:
+            destination_folder[destination_name] = object               # если новый объект назначения - файл
+        print(f"{source_path} -> {destination_path}: перемещено и/или переименовано")
+
+
+def handle_chown(args):
+    if len(args) != 3:                                                  # проверяем, что передано ровно 2 аргумента
+        print('chown: требуется два аргумента: <пользователь> <путь к объекту>')
+        return
+
+    new_owner, path_str = args[1], args[2]                               # получаем имя нового владельца и путь к объекту
+
+    if path_str.startswith('/'):                                        # путь от рута
+        path_parts = ["root"] + [i for i in path_str.split("/") if i]
+    else:                                                               # относительный путь от текущей директории
+        path_parts = params["current_working_directory"] + [i for i in path_str.split("/") if i]
+
+    parent_folder = get_folder(path_parts[:-1])                         # получаем папку, в которой находится объект
+    name = path_parts[-1]                                               # имя объекта внутри этой папки
+
+    if parent_folder is None or name not in parent_folder:              # если папка не существует или объект не найден
+        print(f"chown: объект {path_str} не найден")
+        return
+
+    obj = parent_folder[name]                                           # получен объект
+    obj["_owner"] = new_owner                                           # меняем владельца
+    print(f"{path_str}: владелец изменён на {new_owner}")
 
 def repl():
     """
@@ -311,7 +404,7 @@ if __name__ == "__main__":
         print("Простой эмулятор оболочки по заданию 2")                 # отладочный вывод заданных параметров
     else:
         params['vfs'] = None                                            # если путь не указан, то vfs = None
-        params['current_working_directory'] = ['root']                           # текущий путь root, но он нам не будет нужен
+        params['current_working_directory'] = ['root']                  # текущий путь root, но он нам не будет нужен
 
     if params['script_path'] is not None:                               # если установлен путь на скрипт, начинаем выполнять его
         if not run_script():                                            # если выполнение завершается ошибкой
